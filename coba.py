@@ -44,20 +44,15 @@ async def fetch_with_bs4(url):
             html = await response.text()
             return BeautifulSoup(html, "html.parser")
 
+@st.experimental_memo
 def create_driver():
-    firefox_options = Options()
-    firefox_options.add_argument("--headless")  # Menjalankan Firefox tanpa membuka UI
-    firefox_options.add_argument("--no-sandbox")
-    firefox_options.add_argument("--disable-dev-shm-usage")
-    firefox_options.add_argument("--disable-gpu")
-    firefox_options.add_argument("user-agent=Mozilla/5.0")
+    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-    # Mendapatkan GeckoDriver yang kompatibel dengan Firefox Anda
-    driver_path = GeckoDriverManager().install()
+options = Options()
+options.add_argument('--disable-gpu')
+options.add_argument('--headless')
 
-    # Menjalankan driver Firefox
-    driver = webdriver.Firefox(service=Service(driver_path), options=firefox_options)
-    return driver
+driver = get_driver()
 
 def fetch_with_selenium(url):
     driver = create_driver()
