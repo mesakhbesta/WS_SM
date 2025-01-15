@@ -51,7 +51,9 @@ def create_driver():
     firefox_options.add_argument('--headless')  # Menggunakan mode headless
     firefox_options.add_argument('--disable-gpu')
 
-    # Menggunakan Firefox WebDriver dengan GeckoDriverManager
+    # Tentukan lokasi binary Firefox secara eksplisit
+    firefox_options.binary_location = "/usr/bin/firefox"  # Path default di GitHub Actions
+
     driver = webdriver.Firefox(service=Service(GeckoDriverManager().install()), options=firefox_options)
     return driver
 
