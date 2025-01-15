@@ -52,7 +52,7 @@ options = Options()
 options.add_argument('--disable-gpu')
 options.add_argument('--headless')
 
-driver = get_driver()
+driver = create_driver()
 
 def fetch_with_selenium(url):
     driver = create_driver()
