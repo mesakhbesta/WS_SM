@@ -48,12 +48,7 @@ def create_driver():
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("user-agent=Mozilla/5.0")
     
-    from selenium import webdriver
-    from selenium.webdriver import FirefoxOptions
-    opts = FirefoxOptions()
-    opts.add_argument("--headless")
-    driver = webdriver.Firefox(options=opts)
-
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
     return driver
 
 def fetch_with_selenium(url):
