@@ -6,11 +6,9 @@ import aiohttp
 import asyncio
 import pandas as pd
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.service import Service
+from webdriver_manager.firefox import GeckoDriverManager
 
 media_urls = {
     "kompas": "https://www.kompas.com/",
@@ -47,16 +45,18 @@ async def fetch_with_bs4(url):
             return BeautifulSoup(html, "html.parser")
 
 def create_driver():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("user-agent=Mozilla/5.0")
-    driver_path = ChromeDriverManager(version="120.0.6099.224").install()
-    
-    # Menjalankan driver
-    driver = webdriver.Chrome(service=Service(driver_path), options=chrome_options)
+    firefox_options = Options()
+    firefox_options.add_argument("--headless")  # Menjalankan Firefox tanpa membuka UI
+    firefox_options.add_argument("--no-sandbox")
+    firefox_options.add_argument("--disable-dev-shm-usage")
+    firefox_options.add_argument("--disable-gpu")
+    firefox_options.add_argument("user-agent=Mozilla/5.0")
+
+    # Mendapatkan GeckoDriver yang kompatibel dengan Firefox Anda
+    driver_path = GeckoDriverManager().install()
+
+    # Menjalankan driver Firefox
+    driver = webdriver.Firefox(service=Service(driver_path), options=firefox_options)
     return driver
 
 def fetch_with_selenium(url):
