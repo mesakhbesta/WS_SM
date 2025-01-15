@@ -54,7 +54,7 @@ def create_driver():
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("user-agent=Mozilla/5.0")
 
-     driver_path = ChromeDriverManager().install()  # Menggunakan ChromeDriverManager untuk mendapatkan driver yang sesuai
+    driver_path = ChromeDriverManager().install()  # Menggunakan ChromeDriverManager untuk mendapatkan driver yang sesuai
     
     # Menjalankan driver
     driver = webdriver.Chrome(service=Service(driver_path), options=chrome_options)
