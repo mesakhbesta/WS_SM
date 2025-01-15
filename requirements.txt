@@ -3,3 +3,6 @@ selenium==4.27.1
 beautifulsoup4==4.12.3
 aiohttp==3.11.11
 pandas==2.2.2
+streamlit
+seleniumbase
+webdriver-manager
