@@ -4,8 +4,6 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
-import aiohttp
-import asyncio
 import pandas as pd
 
 media_urls = {
@@ -34,13 +32,14 @@ def class_filter(media_name):
     }
     return mapping.get(media_name, (None, None))
 
-async def fetch_with_bs4(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            if response.status == 403:
-                return None
-            html = await response.text()
-            return BeautifulSoup(html, "html.parser")
+def fetch_with_bs4(url):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Will raise an exception for 4xx/5xx status codes
+        html = response.text
+        return BeautifulSoup(html, "html.parser")
+    except requests.exceptions.RequestException as e:
+        return None
 
 def create_driver():
     chrome_options = Options()
@@ -60,7 +59,7 @@ def fetch_with_selenium(url):
     driver.quit()
     return BeautifulSoup(html, "html.parser")
 
-async def scrape_news(name):
+def scrape_news(name):
     try:
         url = media_urls.get(name)
         if not url:
@@ -70,7 +69,7 @@ async def scrape_news(name):
         if not class_name:
             return f"Class name not defined for {name}"
 
-        soup = await fetch_with_bs4(url)
+        soup = fetch_with_bs4(url)
         if not soup:
             soup = fetch_with_selenium(url)
 
@@ -100,9 +99,12 @@ async def scrape_news(name):
     except Exception as e:
         return [f"Error: {e}"]
 
-async def scrape_all_news(sources):
-    tasks = [scrape_news(source) for source in sources]
-    return await asyncio.gather(*tasks)
+def scrape_all_news(sources):
+    all_news = {}
+    for source in sources:
+        headlines = scrape_news(source)
+        all_news[source] = headlines
+    return all_news
 
 st.set_page_config(page_title="News Comparison", page_icon="📰", layout="wide")
 
@@ -143,11 +145,7 @@ if st.sidebar.button("Scrape News"):
     else:
         st.write("### Scraping Results")
         with st.spinner('Scraping news...'):
-            all_news = {}
-            results = await scrape_all_news(selected_sources)
-
-            for i, source in enumerate(selected_sources):
-                all_news[source] = results[i]
+            all_news = scrape_all_news(selected_sources)
 
             for source, headlines in all_news.items():
                 st.markdown(f"📍 <span style='font-size: 30px; font-weight: bold;'>{source.capitalize()}</span> - <a href='{media_urls[source]}' target='_blank' style='font-size: 15px;'>Read More</a>", unsafe_allow_html=True)
