@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import aiohttp
 import asyncio
 import pandas as pd
+from webdriver_manager.chrome import ChromeDriverManager
 
 media_urls = {
     "kompas": "https://www.kompas.com/",
