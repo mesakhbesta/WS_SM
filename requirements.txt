@@ -5,4 +5,4 @@ aiohttp==3.11.11
 pandas==2.2.2
 streamlit
 seleniumbase
-webdriver-manager
+webdriver-manager>=3.8.5
