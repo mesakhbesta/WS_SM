@@ -54,7 +54,10 @@ def create_driver():
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("user-agent=Mozilla/5.0")
 
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    driver_path = ChromeDriverManager(version="114.0.5735.90").install()
+    
+    # Menjalankan driver
+    driver = webdriver.Chrome(service=Service(driver_path), options=chrome_options)
     return driver
 
 def fetch_with_selenium(url):
