@@ -1,9 +1,9 @@
 import streamlit as st
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
+import aiohttp
+import asyncio
 import pandas as pd
 
 media_urls = {
@@ -32,14 +32,13 @@ def class_filter(media_name):
     }
     return mapping.get(media_name, (None, None))
 
-def fetch_with_bs4(url):
-    try:
-        response = requests.get(url)
-        response.raise_for_status()  # Will raise an exception for 4xx/5xx status codes
-        html = response.text
-        return BeautifulSoup(html, "html.parser")
-    except requests.exceptions.RequestException as e:
-        return None
+async def fetch_with_bs4(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 403:
+                return None
+            html = await response.text()
+            return BeautifulSoup(html, "html.parser")
 
 def create_driver():
     chrome_options = Options()
@@ -48,8 +47,13 @@ def create_driver():
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("user-agent=Mozilla/5.0")
+    
+    from selenium import webdriver
+    from selenium.webdriver import FirefoxOptions
+    opts = FirefoxOptions()
+    opts.add_argument("--headless")
+    driver = webdriver.Firefox(options=opts)
 
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
     return driver
 
 def fetch_with_selenium(url):
@@ -59,7 +63,7 @@ def fetch_with_selenium(url):
     driver.quit()
     return BeautifulSoup(html, "html.parser")
 
-def scrape_news(name):
+async def scrape_news(name):
     try:
         url = media_urls.get(name)
         if not url:
@@ -69,7 +73,7 @@ def scrape_news(name):
         if not class_name:
             return f"Class name not defined for {name}"
 
-        soup = fetch_with_bs4(url)
+        soup = await fetch_with_bs4(url)
         if not soup:
             soup = fetch_with_selenium(url)
 
@@ -99,12 +103,9 @@ def scrape_news(name):
     except Exception as e:
         return [f"Error: {e}"]
 
-def scrape_all_news(sources):
-    all_news = {}
-    for source in sources:
-        headlines = scrape_news(source)
-        all_news[source] = headlines
-    return all_news
+async def scrape_all_news(sources):
+    tasks = [scrape_news(source) for source in sources]
+    return await asyncio.gather(*tasks)
 
 st.set_page_config(page_title="News Comparison", page_icon="📰", layout="wide")
 
@@ -145,7 +146,11 @@ if st.sidebar.button("Scrape News"):
     else:
         st.write("### Scraping Results")
         with st.spinner('Scraping news...'):
-            all_news = scrape_all_news(selected_sources)
+            all_news = {}
+            results = asyncio.run(scrape_all_news(selected_sources))
+
+            for i, source in enumerate(selected_sources):
+                all_news[source] = results[i]
 
             for source, headlines in all_news.items():
                 st.markdown(f"📍 <span style='font-size: 30px; font-weight: bold;'>{source.capitalize()}</span> - <a href='{media_urls[source]}' target='_blank' style='font-size: 15px;'>Read More</a>", unsafe_allow_html=True)
