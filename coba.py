@@ -1,14 +1,13 @@
 import streamlit as st
 from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.firefox.service import Service
-from webdriver_manager.firefox import GeckoDriverManager
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import aiohttp
 import asyncio
 import pandas as pd
 
-# Daftar URL sumber berita
 media_urls = {
     "kompas": "https://www.kompas.com/",
     "detik": "https://www.detik.com/terpopuler?utm_source=wpmdetikcom&utm_medium=boxmostpop&utm_campaign=mostpop",
@@ -21,7 +20,6 @@ media_urls = {
     "jawapos": "https://www.jawapos.com/",
 }
 
-# Mapping untuk filter class dan elemen selector
 def class_filter(media_name):
     mapping = {
         "kompas": ("mostWrap", "div"),
@@ -36,7 +34,6 @@ def class_filter(media_name):
     }
     return mapping.get(media_name, (None, None))
 
-# Fungsi untuk mengambil HTML menggunakan BeautifulSoup dan aiohttp
 async def fetch_with_bs4(url):
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
@@ -45,19 +42,17 @@ async def fetch_with_bs4(url):
             html = await response.text()
             return BeautifulSoup(html, "html.parser")
 
-# Menggunakan Firefox
 def create_driver():
-    firefox_options = Options()
-    firefox_options.add_argument('--headless')  # Menggunakan mode headless
-    firefox_options.add_argument('--disable-gpu')
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("user-agent=Mozilla/5.0")
 
-    # Tentukan lokasi binary Firefox secara eksplisit
-    firefox_options.binary_location = "/usr/bin/firefox"  # Path default di GitHub Actions
-
-    driver = webdriver.Firefox(service=Service(GeckoDriverManager().install()), options=firefox_options)
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
     return driver
 
-# Fungsi untuk mengambil HTML menggunakan Selenium dengan Firefox
 def fetch_with_selenium(url):
     driver = create_driver()
     driver.get(url)
@@ -65,7 +60,6 @@ def fetch_with_selenium(url):
     driver.quit()
     return BeautifulSoup(html, "html.parser")
 
-# Fungsi untuk mengscrape berita dari berbagai sumber
 async def scrape_news(name):
     try:
         url = media_urls.get(name)
@@ -106,12 +100,10 @@ async def scrape_news(name):
     except Exception as e:
         return [f"Error: {e}"]
 
-# Fungsi untuk mengscrape berita dari semua sumber
 async def scrape_all_news(sources):
     tasks = [scrape_news(source) for source in sources]
     return await asyncio.gather(*tasks)
 
-# Streamlit layout
 st.set_page_config(page_title="News Comparison", page_icon="📰", layout="wide")
 
 st.title("📰 News Scrap & Comparison")
@@ -152,7 +144,7 @@ if st.sidebar.button("Scrape News"):
         st.write("### Scraping Results")
         with st.spinner('Scraping news...'):
             all_news = {}
-            results = asyncio.run(scrape_all_news(selected_sources))
+            results = await scrape_all_news(selected_sources)
 
             for i, source in enumerate(selected_sources):
                 all_news[source] = results[i]
