@@ -66,6 +66,8 @@ async def scrape_news(name):
 
         headlines = container.find_all("h2")  # General headline selector for simplicity
         return [headline.text.strip() for headline in headlines][:5]
+    except Exception as e:
+        return f"Error with scraping {name}: {str(e)}"
 
 async def scrape_all_news(sources):
     tasks = [scrape_news(source) for source in sources]
