@@ -1,11 +1,17 @@
 import streamlit as st
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from bs4 import BeautifulSoup
-import aiohttp
 import asyncio
 import pandas as pd
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from datetime import datetime
+import time
+import aiohttp
+from bs4 import BeautifulSoup
 
+# Web Scraping setup
 media_urls = {
     "kompas": "https://www.kompas.com/",
     "detik": "https://www.detik.com/terpopuler?utm_source=wpmdetikcom&utm_medium=boxmostpop&utm_campaign=mostpop",
@@ -40,29 +46,6 @@ async def fetch_with_bs4(url):
             html = await response.text()
             return BeautifulSoup(html, "html.parser")
 
-def create_driver():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("user-agent=Mozilla/5.0")
-    
-    from selenium import webdriver
-    from selenium.webdriver import FirefoxOptions
-    opts = FirefoxOptions()
-    opts.add_argument("--headless")
-    driver = webdriver.Firefox(options=opts)
-
-    return driver
-
-def fetch_with_selenium(url):
-    driver = create_driver()
-    driver.get(url)
-    html = driver.page_source
-    driver.quit()
-    return BeautifulSoup(html, "html.parser")
-
 async def scrape_news(name):
     try:
         url = media_urls.get(name)
@@ -75,100 +58,124 @@ async def scrape_news(name):
 
         soup = await fetch_with_bs4(url)
         if not soup:
-            soup = fetch_with_selenium(url)
+            return f"Error scraping {name}"
 
         container = soup.find(element_selector, class_=class_name)
         if not container:
             return f"Could not find container for {name}"
 
-        if name == "kompas":
-            headlines = container.find_all(class_="mostTitle")
-        elif name == "detik":
-            headlines = container.find_all(class_="media__title")
-        elif name == "cnn":
-            headlines = container.find_all("h2", class_="text-base text-cnn_black_light group-hover:text-cnn_red")
-        elif name == "liputan6":
-            headlines = container.find_all("h4", class_="article-snippet--numbered__title")
-        elif name == "suaramerdeka":
-            headlines = container.find_all("h2", class_="most__title")
-        elif name == "republika":
-            headlines = container.find_all("a", rel="tooltip")
-        elif name == "tempo":
-            headlines = container.find_all("a", class_="hover:opacity-75")
-        elif name == "ayobandung" or name == "jawapos":
-            headlines = container.find_all("h2", class_="most__title")
-
-        return [headline.text.strip() for headline in headlines if headline.text.strip()][:5]
-
-    except Exception as e:
-        return [f"Error: {e}"]
+        headlines = container.find_all("h2")  # General headline selector for simplicity
+        return [headline.text.strip() for headline in headlines][:5]
 
 async def scrape_all_news(sources):
     tasks = [scrape_news(source) for source in sources]
     return await asyncio.gather(*tasks)
 
-st.set_page_config(page_title="News Comparison", page_icon="📰", layout="wide")
+# Instagram Scraping setup
+def create_driver():
+    opts = Options()
+    opts.add_argument("--headless")
+    driver = webdriver.Firefox(options=opts)
+    return driver
 
-st.title("📰 News Scrap & Comparison")
+def login_instagram(driver):
+    driver.get("https://www.instagram.com")
+    username = WebDriverWait(driver, 200).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "input[name='username']")))
+    password = WebDriverWait(driver, 200).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "input[name='password']")))
+    username.clear()
+    username.send_keys("your_username")
+    password.clear()
+    password.send_keys("your_password")
+    WebDriverWait(driver, 200).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit']"))).click()
+    WebDriverWait(driver, 200).until(EC.element_to_be_clickable((By.XPATH, '//div[contains(text(), "Not now")]'))).click()
 
-st.markdown(
-    """
-    This web allows you to compare top headlines from various media sources. Choose your preferred media outlets and click on **Scrape News** to get the latest updates.
-    """
-)
+def scrape_instagram_posts(driver, account_name):
+    driver.get(f"https://www.instagram.com/{account_name}/")
+    data = []
+    try:
+        for i in range(3):  # Scrape 3 posts
+            post_divs = WebDriverWait(driver, 200).until(
+                EC.presence_of_all_elements_located((By.CLASS_NAME, "_aagv"))
+            )
+            post_div = post_divs[i]
+            driver.execute_script("arguments[0].scrollIntoView();", post_div)
+            driver.execute_script("arguments[0].click();", post_div)
+            time.sleep(2)
 
-st.sidebar.header("🗂 Select News Sources")
-selected_sources = st.sidebar.multiselect(
-    "Choose media to scrape:",
-    options=list(media_urls.keys()),
-    default=list(media_urls.keys())[:3]
-)
+            caption = WebDriverWait(driver, 200).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "h1._ap3a._aaco._aacu._aacx._aad7._aade"))
+            ).text
 
-button_style = """
-    <style>
-    .stButton > button {
-        background-color: #4CAF50;
-        color: white;
-        font-size: 16px;
-        padding: 10px 24px;
-        border-radius: 5px;
-    }
-    .stButton > button:hover {
-        background-color: #45a049;
-    }
-    </style>
-"""
-st.markdown(button_style, unsafe_allow_html=True)
+            time_element = WebDriverWait(driver, 200).until(
+                EC.presence_of_element_located((By.TAG_NAME, "time"))
+            )
+            post_time = time_element.get_attribute("datetime")
+            post_time = datetime.fromisoformat(post_time)
 
-if st.sidebar.button("Scrape News"):
-    if not selected_sources:
-        st.warning("Please select at least one media source.")
-    else:
-        st.write("### Scraping Results")
-        with st.spinner('Scraping news...'):
-            all_news = {}
-            results = asyncio.run(scrape_all_news(selected_sources))
+            post_link = driver.current_url
 
-            for i, source in enumerate(selected_sources):
-                all_news[source] = results[i]
+            data.append({
+                "Account": account_name,
+                "Caption": caption,
+                "Time": post_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "Link": post_link
+            })
+            driver.back()
+            time.sleep(5)
+    except Exception as e:
+        st.error(f"Error with account {account_name}: {e}")
+    return data
 
-            for source, headlines in all_news.items():
-                st.markdown(f"📍 <span style='font-size: 30px; font-weight: bold;'>{source.capitalize()}</span> - <a href='{media_urls[source]}' target='_blank' style='font-size: 15px;'>Read More</a>", unsafe_allow_html=True)
-                
-                headlines_data = []
-                if isinstance(headlines, list):
-                    for idx, headline in enumerate(headlines, start=1):
-                        headlines_data.append({"Headline": headline})
+# Streamlit UI setup
+st.set_page_config(page_title="News Comparison & Instagram Scraper", page_icon="📰", layout="wide")
+st.sidebar.title("Choose Scraper Type")
+scraper_type = st.sidebar.radio("Select scraper:", ["Scrape Web", "Scrape Instagram"])
 
-                df = pd.DataFrame(headlines_data)
-                df.reset_index(drop=True, inplace=True)
-                df.index = df.index + 1 
+if scraper_type == "Scrape Web":
+    st.title("📰 News Scraper")
+    st.markdown("This tool scrapes the latest headlines from various news outlets.")
+    selected_sources = st.sidebar.multiselect(
+        "Choose media to scrape:",
+        options=list(media_urls.keys()),
+        default=["kompas", "detik", "cnn"]
+    )
 
-                st.table(df)
-
-st.markdown(
-    """
-    ---
-    Developed by Mesakh Besta Anugrah🛡️.
-    """
-)
+    if st.sidebar.button("Scrape News"):
+        if not selected_sources:
+            st.warning("Please select at least one media source.")
+        else:
+            st.write("### Scraping Results")
+            with st.spinner("Scraping news..."):
+                all_news = {}
+                results = asyncio.run(scrape_all_news(selected_sources))
+                for i, source in enumerate(selected_sources):
+                    all_news[source] = results[i]
+                for source, headlines in all_news.items():
+                    st.markdown(f"### {source.capitalize()}")
+                    st.write(headlines)
+            
+elif scraper_type == "Scrape Instagram":
+    st.title("📸 Instagram Post Scraper")
+    account_input = st.sidebar.text_input("Enter Instagram account names (comma separated):")
+    if st.sidebar.button("Scrape Posts"):
+        if account_input:
+            driver = create_driver()
+            login_instagram(driver)
+            accounts = [account.strip() for account in account_input.split(",")]
+            all_posts = []
+            for account in accounts:
+                posts = scrape_instagram_posts(driver, account)
+                all_posts.extend(posts)
+            driver.quit()
+            
+            if all_posts:
+                st.write("### Instagram Posts")
+                for post in all_posts:
+                    st.write(f"**{post['Account']}** - {post['Caption']} [{post['Link']}]")
+            else:
+                st.error("No posts found.")
+        else:
+            st.warning("Please enter Instagram account names.")
+    
+st.markdown("---")
+st.write("Developed by **Mesakh Besta Anugrah** 🛡️")
