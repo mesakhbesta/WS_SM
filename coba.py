@@ -9,7 +9,6 @@ import time
 import asyncio
 from bs4 import BeautifulSoup
 import aiohttp
-import pandas as pd
 
 # Media URLs for web scraping
 media_urls = {
@@ -162,7 +161,7 @@ if menu == "Web Scraping":
                     st.markdown(f"📍 **{source.capitalize()}**")
                     for headline in headlines:
                         st.write(f"- {headline}")
-                
+
 # Instagram Scraping
 elif menu == "Instagram Scraping":
     st.title("Instagram Post Scraper 📸")
